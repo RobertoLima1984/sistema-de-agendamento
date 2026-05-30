@@ -1,13 +1,13 @@
 // =============================================
-//   INFLAFEST — Fluxo de Caixa Page
+//   ESPAÇO KIDS LOCAÇÕES — Fluxo de Caixa
 //   src/pages/FluxoCaixa.jsx
 // =============================================
 
 import { useState } from 'react'
-import { Plus, TrendingUp, TrendingDown, Wallet } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, Wallet, Trash2 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from 'recharts'
 
 import Modal from '../components/Modal'
@@ -50,7 +50,7 @@ export default function FluxoCaixa() {
   const [filtroTipo, setFiltroTipo]   = useState('todos')
   const [form, setForm]               = useState(formVazio())
 
-  // ── Cálculos ──────────────────────────────
+  // ── Cálculos gerais ───────────────────────
   const totalEntradas = lancamentos
     .filter(l => l.tipo === 'entrada')
     .reduce((acc, l) => acc + l.valor, 0)
@@ -61,10 +61,16 @@ export default function FluxoCaixa() {
 
   const saldo = totalEntradas - totalSaidas
 
-  // ── Filtro ────────────────────────────────
+  // ── Filtro da tabela ──────────────────────
   const lancamentosFiltrados = lancamentos
     .filter(l => filtroTipo === 'todos' ? true : l.tipo === filtroTipo)
     .sort((a, b) => new Date(b.data) - new Date(a.data))
+
+  // ── Dados do gráfico de saldo acumulado ───
+  const dadosSaldo = dadosMensais.map((m, i) => ({
+    ...m,
+    saldo: dadosMensais.slice(0, i + 1).reduce((acc, x) => acc + x.receita - x.despesa, 0),
+  }))
 
   // ── Handlers ──────────────────────────────
   function handleChange(e) {
@@ -72,11 +78,12 @@ export default function FluxoCaixa() {
   }
 
   function handleSalvar() {
-    if (!form.descricao || !form.valor || !form.data) {
-      return alert('Descrição, valor e data são obrigatórios.')
-    }
+    if (!form.descricao.trim()) return alert('Descrição é obrigatória.')
+    if (!form.valor)            return alert('Valor é obrigatório.')
+    if (!form.data)             return alert('Data é obrigatória.')
+
     const novo = {
-      id: lancamentos.length + 1,
+      id:        lancamentos.length + 1,
       tipo:      form.tipo,
       descricao: form.descricao,
       categoria: form.categoria,
@@ -88,13 +95,18 @@ export default function FluxoCaixa() {
     setModalNovo(false)
   }
 
+  function handleExcluir(id) {
+    if (!confirm('Deseja excluir este lançamento?')) return
+    setLancamentos(prev => prev.filter(l => l.id !== id))
+  }
+
   return (
     <div>
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
           <h2>Fluxo de Caixa</h2>
-          <p>Controle de entradas e saídas — maio 2026</p>
+          <p>Controle financeiro — 2026</p>
         </div>
         <button className="btn btn-primary" onClick={() => setModalNovo(true)}>
           <Plus size={15} />
@@ -102,11 +114,11 @@ export default function FluxoCaixa() {
         </button>
       </div>
 
-      {/* Resumo */}
-      <div className="grid-3 mb-24">
+      {/* Cards de resumo */}
+      <div className="grid-3 mb-28">
         <div className="fc-summary-card fc-receita">
           <div className="fc-summary-icon">
-            <TrendingUp size={18} />
+            <TrendingUp size={20} />
           </div>
           <div>
             <div className="fc-summary-label">Total Entradas</div>
@@ -115,7 +127,7 @@ export default function FluxoCaixa() {
         </div>
         <div className="fc-summary-card fc-despesa">
           <div className="fc-summary-icon">
-            <TrendingDown size={18} />
+            <TrendingDown size={20} />
           </div>
           <div>
             <div className="fc-summary-label">Total Saídas</div>
@@ -124,44 +136,88 @@ export default function FluxoCaixa() {
         </div>
         <div className="fc-summary-card fc-saldo">
           <div className="fc-summary-icon">
-            <Wallet size={18} />
+            <Wallet size={20} />
           </div>
           <div>
-            <div className="fc-summary-label">Saldo do Mês</div>
+            <div className="fc-summary-label">Saldo Atual</div>
             <div className="fc-summary-valor">{formatCurrency(saldo)}</div>
           </div>
         </div>
       </div>
 
-      {/* Gráfico */}
-      <div className="card mb-24">
-        <div className="card-title">
-          <TrendingUp size={15} />
-          Receitas vs Despesas (últimos 6 meses)
+      {/* Gráficos */}
+      <div className="grid-2 mb-28">
+
+        {/* Receitas vs Despesas — 12 meses */}
+        <div className="card">
+          <div className="card-title">
+            <TrendingUp size={15} />
+            Receitas vs Despesas — 12 meses
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={dadosMensais} barGap={4} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis
+                dataKey="mes"
+                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`}
+                width={42}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="receita" name="Receita" fill="#1D9E75" radius={[4,4,0,0]} />
+              <Bar dataKey="despesa" name="Despesa" fill="#FCA5A5" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="chart-legenda">
+            <span><span className="legend-dot" style={{ background: '#1D9E75' }} />Receitas</span>
+            <span><span className="legend-dot" style={{ background: '#FCA5A5' }} />Despesas</span>
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={dadosMensais} barGap={6}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-            <XAxis
-              dataKey="mes"
-              tick={{ fontSize: 11, fill: '#9CA3AF' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: '#9CA3AF' }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={v => `R$${(v / 1000).toFixed(1)}k`}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="receita" name="Receita" fill="#1D9E75" radius={[4,4,0,0]} />
-            <Bar dataKey="despesa" name="Despesa" fill="#FCA5A5" radius={[4,4,0,0]} />
-          </BarChart>
-        </ResponsiveContainer>
-        <div className="chart-legenda">
-          <span><span className="legend-dot" style={{ background: '#1D9E75' }} /> Receitas</span>
-          <span><span className="legend-dot" style={{ background: '#FCA5A5' }} /> Despesas</span>
+
+        {/* Saldo acumulado — 12 meses */}
+        <div className="card">
+          <div className="card-title">
+            <Wallet size={15} />
+            Saldo Acumulado — 12 meses
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={dadosSaldo}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis
+                dataKey="mes"
+                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`}
+                width={46}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Line
+                type="monotone"
+                dataKey="saldo"
+                name="Saldo"
+                stroke="#378ADD"
+                strokeWidth={2.5}
+                dot={{ fill: '#378ADD', r: 3 }}
+                activeDot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="chart-legenda">
+            <span><span className="legend-dot" style={{ background: '#378ADD' }} />Saldo acumulado</span>
+          </div>
         </div>
       </div>
 
@@ -198,53 +254,62 @@ export default function FluxoCaixa() {
                 <th>Categoria</th>
                 <th>Tipo</th>
                 <th style={{ textAlign: 'right' }}>Valor</th>
+                <th>Ação</th>
               </tr>
             </thead>
             <tbody>
               {lancamentosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
                     Nenhum lançamento encontrado.
                   </td>
                 </tr>
-              ) : (
-                lancamentosFiltrados.map(l => (
-                  <tr key={l.id}>
-                    <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                      {formatDate(l.data)}
-                    </td>
-                    <td className="td-name">{l.descricao}</td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>{l.categoria}</td>
-                    <td><Badge status={l.tipo} /></td>
-                    <td style={{
-                      textAlign: 'right',
-                      fontWeight: 700,
-                      color: l.tipo === 'entrada'
-                        ? 'var(--color-primary)'
-                        : 'var(--color-danger)',
-                    }}>
-                      {l.tipo === 'entrada' ? '+' : '-'}{formatCurrency(l.valor)}
-                    </td>
-                  </tr>
-                ))
-              )}
+              ) : lancamentosFiltrados.map(l => (
+                <tr key={l.id}>
+                  <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                    {formatDate(l.data)}
+                  </td>
+                  <td className="td-name">{l.descricao}</td>
+                  <td style={{ color: 'var(--color-text-muted)' }}>{l.categoria}</td>
+                  <td><Badge status={l.tipo} /></td>
+                  <td style={{
+                    textAlign: 'right',
+                    fontWeight: 700,
+                    color: l.tipo === 'entrada'
+                      ? 'var(--color-primary)'
+                      : 'var(--color-danger)',
+                  }}>
+                    {l.tipo === 'entrada' ? '+' : '-'}{formatCurrency(l.valor)}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-sm btn-icon btn-danger"
+                      title="Excluir"
+                      onClick={() => handleExcluir(l.id)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Novo Lançamento */}
+      {/* ── Modal Novo Lançamento ── */}
       <Modal
         open={modalNovo}
         onClose={() => { setModalNovo(false); setForm(formVazio()) }}
         title="Novo Lançamento"
+        width="480px"
       >
         <div className="form-row">
           <div className="form-group">
             <label className="form-label">Tipo *</label>
             <select className="form-control" name="tipo" value={form.tipo} onChange={handleChange}>
-              <option value="entrada">Entrada (Receita)</option>
-              <option value="saida">Saída (Despesa)</option>
+              <option value="entrada">💰 Entrada (Receita)</option>
+              <option value="saida">💸 Saída (Despesa)</option>
             </select>
           </div>
           <div className="form-group">
@@ -259,7 +324,9 @@ export default function FluxoCaixa() {
             />
           </div>
         </div>
+
         <div className="form-row">
+          {/* Campo data com calendário nativo */}
           <div className="form-group">
             <label className="form-label">Data *</label>
             <input
@@ -279,6 +346,7 @@ export default function FluxoCaixa() {
             </select>
           </div>
         </div>
+
         <div className="form-group">
           <label className="form-label">Descrição *</label>
           <input
@@ -289,6 +357,23 @@ export default function FluxoCaixa() {
             onChange={handleChange}
           />
         </div>
+
+        {/* Preview do lançamento */}
+        {form.valor && form.descricao && (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-md)',
+            background: form.tipo === 'entrada' ? 'var(--color-primary-light)' : 'var(--color-danger-light)',
+            fontSize: 13, fontWeight: 700,
+            color: form.tipo === 'entrada' ? 'var(--color-primary-dark)' : 'var(--color-danger)',
+            display: 'flex', justifyContent: 'space-between',
+            marginBottom: 4,
+          }}>
+            <span>{form.tipo === 'entrada' ? '💰' : '💸'} {form.descricao}</span>
+            <span>{form.tipo === 'entrada' ? '+' : '-'}{formatCurrency(Number(form.valor))}</span>
+          </div>
+        )}
+
         <Modal.Footer>
           <button className="btn" onClick={() => { setModalNovo(false); setForm(formVazio()) }}>
             Cancelar
@@ -304,9 +389,9 @@ export default function FluxoCaixa() {
 
 function formVazio() {
   return {
-    tipo: 'entrada',
-    valor: '',
-    data: new Date().toISOString().split('T')[0],
+    tipo:      'entrada',
+    valor:     '',
+    data:      new Date().toISOString().split('T')[0],
     categoria: 'Aluguel de inflável',
     descricao: '',
   }

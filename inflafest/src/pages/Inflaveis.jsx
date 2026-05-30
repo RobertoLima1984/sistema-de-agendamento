@@ -1,38 +1,89 @@
 // =============================================
-//   INFLAFEST — Infláveis Page
+//   ESPAÇO KIDS LOCAÇÕES — Infláveis Page
 //   src/pages/Inflaveis.jsx
 // =============================================
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, Eye } from 'lucide-react'
 
 import Modal from '../components/Modal'
 import Badge from '../components/Badge'
 import { inflaveis as inflaveisMock, formatCurrency } from '../data/mockData'
 
-export default function Inflaveis() {
-  const [inflaveis, setInflaveis] = useState(inflaveisMock)
-  const [modalNovo, setModalNovo] = useState(false)
-  const [modalVer, setModalVer]   = useState(null)
-  const [form, setForm]           = useState(formVazio())
-  const [filtro, setFiltro]       = useState('todos')
+// ── Lista de emojis disponíveis ───────────────
+const EMOJIS = [
+  '🎪','🏰','🌊','🎉','🐉','🔵','🎠','🎡','🎢','🎃',
+  '🦁','🐸','🦄','🐻','🐼','🦊','🐯','🐨','🦋','🌈',
+  '⭐','🌟','💫','🎈','🎁','🎀','🎊','🏆','🚀','🌺',
+  '🍭','🍦','🧁','🍩','🎂','🏄','🤸','🎯','🎲','🎮',
+]
 
+export default function Inflaveis() {
+  const [inflaveis, setInflaveis]     = useState(inflaveisMock)
+  const [modalNovo, setModalNovo]     = useState(false)
+  const [modalVer, setModalVer]       = useState(null)
+  const [form, setForm]               = useState(formVazio())
+  const [filtro, setFiltro]           = useState('todos')
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+  const emojiRef = useRef(null)
+
+  // Fecha emoji picker ao clicar fora
+  useEffect(() => {
+    function handleClick(e) {
+      if (emojiRef.current && !emojiRef.current.contains(e.target)) {
+        setEmojiPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  // ── Filtro ────────────────────────────────
   const inflaveisFiltrados = inflaveis.filter(i =>
     filtro === 'todos' ? true : i.status === filtro
   )
 
+  const contadores = {
+    todos:      inflaveis.length,
+    disponivel: inflaveis.filter(i => i.status === 'disponivel').length,
+    alugado:    inflaveis.filter(i => i.status === 'alugado').length,
+    manutencao: inflaveis.filter(i => i.status === 'manutencao').length,
+  }
+
+  // ── Handlers ──────────────────────────────
   function handleChange(e) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
+  // Formata as dimensões automaticamente
+  function handleDimensoes(e) {
+    const { name, value } = e.target
+    setForm(prev => {
+      const updated = { ...prev, [name]: value }
+      // Monta a string formatada: "ALT Xm COM Ym LAR Zm"
+      const alt = updated.dimAlt ? `ALT ${updated.dimAlt}m` : ''
+      const com = updated.dimCom ? `COM ${updated.dimCom}m` : ''
+      const lar = updated.dimLar ? `LAR ${updated.dimLar}m` : ''
+      updated.dimensoes = [alt, com, lar].filter(Boolean).join(' ')
+      return updated
+    })
+  }
+
   function handleSalvar() {
-    if (!form.nome || !form.precoDia) return alert('Nome e preço são obrigatórios.')
+    if (!form.nome.trim())    return alert('Nome é obrigatório.')
+    if (!form.precoDia)       return alert('Preço é obrigatório.')
+
     const novo = {
       id: inflaveis.length + 1,
-      ...form,
-      precoDia: Number(form.precoDia),
+      nome:          form.nome,
+      emoji:         form.emoji || '🎪',
+      precoDia:      Number(form.precoDia),
+      dimensoes:     form.dimensoes,
+      idadeMinima:   form.idadeMinima,
+      capacidade:    form.capacidade,
+      status:        form.status,
+      descricao:     form.descricao,
       totalAlugueis: 0,
-      emoji: form.emoji || '🎪',
     }
     setInflaveis(prev => [novo, ...prev])
     setForm(formVazio())
@@ -52,13 +103,6 @@ export default function Inflaveis() {
     setModalVer(prev => prev ? { ...prev, status: novoStatus } : null)
   }
 
-  const contadores = {
-    todos:      inflaveis.length,
-    disponivel: inflaveis.filter(i => i.status === 'disponivel').length,
-    alugado:    inflaveis.filter(i => i.status === 'alugado').length,
-    manutencao: inflaveis.filter(i => i.status === 'manutencao').length,
-  }
-
   return (
     <div>
       {/* Header */}
@@ -76,10 +120,10 @@ export default function Inflaveis() {
       {/* Filtros */}
       <div className="filtro-tabs mb-16">
         {[
-          { key: 'todos',      label: 'Todos'       },
-          { key: 'disponivel', label: 'Disponíveis' },
-          { key: 'alugado',    label: 'Alugados'    },
-          { key: 'manutencao', label: 'Manutenção'  },
+          { key: 'todos',      label: 'Todos'        },
+          { key: 'disponivel', label: 'Disponíveis'  },
+          { key: 'alugado',    label: 'Alugados'     },
+          { key: 'manutencao', label: 'Manutenção'   },
         ].map(f => (
           <button
             key={f.key}
@@ -99,11 +143,13 @@ export default function Inflaveis() {
             <div className="inflavel-emoji">{inf.emoji}</div>
             <div className="inflavel-info">
               <div className="inflavel-nome">{inf.nome}</div>
-              <div className="inflavel-preco">{formatCurrency(inf.precoDia)}<span>/dia</span></div>
+              <div className="inflavel-preco">
+                {formatCurrency(inf.precoDia)}<span>/dia</span>
+              </div>
               <div className="inflavel-detalhes">
-                <span>📐 {inf.dimensoes}</span>
-                <span>👶 {inf.idadeMinima}</span>
-                <span>👥 {inf.capacidade}</span>
+                {inf.dimensoes && <span>📐 {inf.dimensoes}</span>}
+                {inf.idadeMinima && <span>👶 {inf.idadeMinima}</span>}
+                {inf.capacidade && <span>👥 {inf.capacidade}</span>}
               </div>
               <div className="inflavel-footer">
                 <Badge status={inf.status} />
@@ -129,20 +175,55 @@ export default function Inflaveis() {
         ))}
 
         {/* Card adicionar */}
-        <div className="inflavel-card inflavel-card-add" onClick={() => setModalNovo(true)}>
+        <div
+          className="inflavel-card inflavel-card-add"
+          onClick={() => setModalNovo(true)}
+        >
           <Plus size={24} />
           <span>Adicionar inflável</span>
         </div>
       </div>
 
-      {/* Modal Novo Inflável */}
+      {/* ── Modal Novo Inflável ── */}
       <Modal
         open={modalNovo}
         onClose={() => { setModalNovo(false); setForm(formVazio()) }}
         title="Novo Inflável"
+        width="520px"
       >
-        <div className="form-row">
-          <div className="form-group">
+        {/* Emoji picker + Nome */}
+        <div className="form-row" style={{ alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ flex: '0 0 auto' }}>
+            <label className="form-label">Emoji</label>
+            <div className="emoji-picker-wrap" ref={emojiRef}>
+              <button
+                className="emoji-picker-btn"
+                onClick={() => setEmojiPickerOpen(o => !o)}
+                type="button"
+              >
+                {form.emoji}
+                <span>Trocar ▾</span>
+              </button>
+              {emojiPickerOpen && (
+                <div className="emoji-grid">
+                  {EMOJIS.map(e => (
+                    <div
+                      key={e}
+                      className="emoji-option"
+                      onClick={() => {
+                        setForm(prev => ({ ...prev, emoji: e }))
+                        setEmojiPickerOpen(false)
+                      }}
+                    >
+                      {e}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label">Nome do inflável *</label>
             <input
               className="form-control"
@@ -152,17 +233,8 @@ export default function Inflaveis() {
               onChange={handleChange}
             />
           </div>
-          <div className="form-group">
-            <label className="form-label">Emoji</label>
-            <input
-              className="form-control"
-              name="emoji"
-              placeholder="🎪"
-              value={form.emoji}
-              onChange={handleChange}
-            />
-          </div>
         </div>
+
         <div className="form-row">
           <div className="form-group">
             <label className="form-label">Preço por dia (R$) *</label>
@@ -184,17 +256,72 @@ export default function Inflaveis() {
             </select>
           </div>
         </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Dimensões</label>
-            <input
-              className="form-control"
-              name="dimensoes"
-              placeholder="Ex: 4m x 4m"
-              value={form.dimensoes}
-              onChange={handleChange}
-            />
+
+        {/* Dimensões com campos separados */}
+        <div className="form-group">
+          <label className="form-label">Dimensões</label>
+          <div className="form-row-3" style={{ marginBottom: 6 }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>
+                ALT (altura)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input
+                  className="form-control"
+                  name="dimAlt"
+                  placeholder="4,20"
+                  value={form.dimAlt}
+                  onChange={handleDimensoes}
+                />
+                <span style={{ color: 'var(--color-text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>m</span>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>
+                COM (comprimento)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input
+                  className="form-control"
+                  name="dimCom"
+                  placeholder="5,00"
+                  value={form.dimCom}
+                  onChange={handleDimensoes}
+                />
+                <span style={{ color: 'var(--color-text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>m</span>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>
+                LAR (largura)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input
+                  className="form-control"
+                  name="dimLar"
+                  placeholder="3,00"
+                  value={form.dimLar}
+                  onChange={handleDimensoes}
+                />
+                <span style={{ color: 'var(--color-text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>m</span>
+              </div>
+            </div>
           </div>
+          {/* Preview das dimensões formatadas */}
+          {form.dimensoes && (
+            <div style={{
+              padding: '7px 12px',
+              background: 'var(--color-primary-light)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 12, fontWeight: 700,
+              color: 'var(--color-primary-dark)',
+            }}>
+              📐 {form.dimensoes}
+            </div>
+          )}
+        </div>
+
+        <div className="form-row">
           <div className="form-group">
             <label className="form-label">Capacidade</label>
             <input
@@ -205,8 +332,6 @@ export default function Inflaveis() {
               onChange={handleChange}
             />
           </div>
-        </div>
-        <div className="form-row">
           <div className="form-group">
             <label className="form-label">Idade mínima</label>
             <input
@@ -218,6 +343,7 @@ export default function Inflaveis() {
             />
           </div>
         </div>
+
         <div className="form-group">
           <label className="form-label">Descrição</label>
           <textarea
@@ -228,6 +354,7 @@ export default function Inflaveis() {
             onChange={handleChange}
           />
         </div>
+
         <Modal.Footer>
           <button className="btn" onClick={() => { setModalNovo(false); setForm(formVazio()) }}>
             Cancelar
@@ -238,7 +365,7 @@ export default function Inflaveis() {
         </Modal.Footer>
       </Modal>
 
-      {/* Modal Ver Inflável */}
+      {/* ── Modal Ver Inflável ── */}
       <Modal
         open={!!modalVer}
         onClose={() => setModalVer(null)}
@@ -250,25 +377,33 @@ export default function Inflaveis() {
               <div className="inflavel-detail-emoji">{modalVer.emoji}</div>
               <div>
                 <div className="inflavel-detail-nome">{modalVer.nome}</div>
-                <div className="inflavel-detail-preco">{formatCurrency(modalVer.precoDia)} / dia</div>
+                <div className="inflavel-detail-preco">
+                  {formatCurrency(modalVer.precoDia)} / dia
+                </div>
               </div>
             </div>
+
             <div className="divider" />
+
             <div className="detail-grid">
-              <DetailItem label="Dimensões"     value={modalVer.dimensoes    || '—'} />
-              <DetailItem label="Capacidade"    value={modalVer.capacidade   || '—'} />
-              <DetailItem label="Idade mínima"  value={modalVer.idadeMinima  || '—'} />
+              <DetailItem label="Dimensões"      value={modalVer.dimensoes    || '—'} />
+              <DetailItem label="Capacidade"     value={modalVer.capacidade   || '—'} />
+              <DetailItem label="Idade mínima"   value={modalVer.idadeMinima  || '—'} />
               <DetailItem label="Total aluguéis" value={modalVer.totalAlugueis} />
             </div>
+
             {modalVer.descricao && (
               <>
                 <div className="divider" />
                 <div className="form-group">
                   <span className="form-label">Descrição</span>
-                  <p style={{ marginTop: 4, color: 'var(--color-text)' }}>{modalVer.descricao}</p>
+                  <p style={{ marginTop: 4, color: 'var(--color-text)' }}>
+                    {modalVer.descricao}
+                  </p>
                 </div>
               </>
             )}
+
             <div className="divider" />
             <div className="form-group">
               <label className="form-label">Alterar status</label>
@@ -282,6 +417,7 @@ export default function Inflaveis() {
                 <option value="manutencao">Manutenção</option>
               </select>
             </div>
+
             <Modal.Footer>
               <button className="btn btn-danger" onClick={() => handleExcluir(modalVer.id)}>
                 <Trash2 size={13} /> Excluir
@@ -295,18 +431,20 @@ export default function Inflaveis() {
   )
 }
 
+// ── Helpers ───────────────────────────────────
 function formVazio() {
   return {
-    nome: '', emoji: '', precoDia: '', status: 'disponivel',
-    dimensoes: '', capacidade: '', idadeMinima: '', descricao: '',
+    nome: '', emoji: '🎪', precoDia: '', status: 'disponivel',
+    dimAlt: '', dimCom: '', dimLar: '', dimensoes: '',
+    capacidade: '', idadeMinima: '', descricao: '',
   }
 }
 
-function DetailItem({ label, value, highlight }) {
+function DetailItem({ label, value }) {
   return (
     <div className="detail-item">
       <span className="detail-label">{label}</span>
-      <span className={`detail-value ${highlight ? 'detail-highlight' : ''}`}>{value}</span>
+      <span className="detail-value">{value}</span>
     </div>
   )
 }

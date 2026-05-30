@@ -1,5 +1,5 @@
 // =============================================
-//   INFLAFEST — Clientes Page
+//   ESPAÇO KIDS LOCAÇÕES — Clientes Page
 //   src/pages/Clientes.jsx
 // =============================================
 
@@ -8,14 +8,19 @@ import { UserPlus, Search, Trash2, Eye } from 'lucide-react'
 
 import Modal from '../components/Modal'
 import Badge from '../components/Badge'
-import { clientes as clientesIniciais, formatCurrency, formatDate } from '../data/mockData'
+import {
+  clientes as clientesIniciais,
+  formatCurrency,
+  formatDate,
+  maskTelefone,
+} from '../data/mockData'
 
 export default function Clientes() {
-  const [clientes, setClientes]     = useState(clientesIniciais)
-  const [busca, setBusca]           = useState('')
-  const [modalNovo, setModalNovo]   = useState(false)
-  const [modalVer, setModalVer]     = useState(null) // cliente selecionado
-  const [form, setForm]             = useState(formVazio())
+  const [clientes, setClientes]   = useState(clientesIniciais)
+  const [busca, setBusca]         = useState('')
+  const [modalNovo, setModalNovo] = useState(false)
+  const [modalVer, setModalVer]   = useState(null)
+  const [form, setForm]           = useState(formVazio())
 
   // ── Filtro de busca ───────────────────────
   const clientesFiltrados = clientes.filter(c =>
@@ -24,13 +29,21 @@ export default function Clientes() {
     c.telefone.includes(busca)
   )
 
-  // ── Handlers do formulário ────────────────
+  // ── Handler genérico ──────────────────────
   function handleChange(e) {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    const { name, value } = e.target
+    // Aplica máscara no campo telefone
+    if (name === 'telefone') {
+      setForm(prev => ({ ...prev, telefone: maskTelefone(value) }))
+    } else {
+      setForm(prev => ({ ...prev, [name]: value }))
+    }
   }
 
   function handleSalvar() {
-    if (!form.nome || !form.telefone) return alert('Nome e telefone são obrigatórios.')
+    if (!form.nome.trim())     return alert('Nome é obrigatório.')
+    if (!form.telefone.trim()) return alert('Telefone é obrigatório.')
+
     const novo = {
       id: clientes.length + 1,
       ...form,
@@ -46,6 +59,7 @@ export default function Clientes() {
   function handleExcluir(id) {
     if (!confirm('Deseja excluir este cliente?')) return
     setClientes(prev => prev.filter(c => c.id !== id))
+    if (modalVer?.id === id) setModalVer(null)
   }
 
   return (
@@ -90,56 +104,50 @@ export default function Clientes() {
           <tbody>
             {clientesFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
                   Nenhum cliente encontrado.
                 </td>
               </tr>
-            ) : (
-              clientesFiltrados.map(c => (
-                <tr key={c.id}>
-                  <td>
-                    <div className="client-avatar-row">
-                      <div className="client-avatar">
-                        {initials(c.nome)}
-                      </div>
-                      <div>
-                        <div className="td-name">{c.nome}</div>
-                        <div className="td-sub">{c.email}</div>
-                      </div>
+            ) : clientesFiltrados.map(c => (
+              <tr key={c.id}>
+                <td>
+                  <div className="client-avatar-row">
+                    <div className="client-avatar">{initials(c.nome)}</div>
+                    <div>
+                      <div className="td-name">{c.nome}</div>
+                      <div className="td-sub">{c.email}</div>
                     </div>
-                  </td>
-                  <td>{c.telefone}</td>
-                  <td>{c.cidade}</td>
-                  <td>
-                    <span className="td-name">{c.totalAgendamentos}</span>
-                  </td>
-                  <td style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
-                    {formatCurrency(c.totalGasto)}
-                  </td>
-                  <td style={{ color: 'var(--color-text-muted)' }}>
-                    {formatDate(c.dataCadastro)}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        className="btn btn-sm btn-icon"
-                        title="Ver detalhes"
-                        onClick={() => setModalVer(c)}
-                      >
-                        <Eye size={13} />
-                      </button>
-                      <button
-                        className="btn btn-sm btn-icon btn-danger"
-                        title="Excluir"
-                        onClick={() => handleExcluir(c.id)}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
+                  </div>
+                </td>
+                <td>{c.telefone}</td>
+                <td>{c.cidade}</td>
+                <td><span className="td-name">{c.totalAgendamentos}</span></td>
+                <td style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
+                  {formatCurrency(c.totalGasto)}
+                </td>
+                <td style={{ color: 'var(--color-text-muted)' }}>
+                  {formatDate(c.dataCadastro)}
+                </td>
+                <td>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn btn-sm btn-icon"
+                      title="Ver detalhes"
+                      onClick={() => setModalVer(c)}
+                    >
+                      <Eye size={13} />
+                    </button>
+                    <button
+                      className="btn btn-sm btn-icon btn-danger"
+                      title="Excluir"
+                      onClick={() => handleExcluir(c.id)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -166,10 +174,18 @@ export default function Clientes() {
             <input
               className="form-control"
               name="telefone"
-              placeholder="(47) 99999-9999"
+              placeholder="(47) 9 9999-9999"
               value={form.telefone}
               onChange={handleChange}
+              maxLength={17}
+              inputMode="numeric"
             />
+            {/* Preview da máscara */}
+            {form.telefone && (
+              <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 3 }}>
+                📱 {form.telefone}
+              </span>
+            )}
           </div>
         </div>
         <div className="form-row">
@@ -189,7 +205,7 @@ export default function Clientes() {
             <input
               className="form-control"
               name="cidade"
-              placeholder="Ituporanga"
+              placeholder="Ex: Ituporanga"
               value={form.cidade}
               onChange={handleChange}
             />
@@ -232,29 +248,43 @@ export default function Clientes() {
                 <div className="client-detail-sub">{modalVer.email}</div>
               </div>
             </div>
+
             <div className="divider" />
+
             <div className="detail-grid">
-              <DetailItem label="Telefone"      value={modalVer.telefone} />
-              <DetailItem label="Cidade"        value={modalVer.cidade} />
-              <DetailItem label="Cadastro"      value={formatDate(modalVer.dataCadastro)} />
-              <DetailItem label="Agendamentos"  value={modalVer.totalAgendamentos} />
+              <DetailItem label="Telefone"     value={modalVer.telefone} />
+              <DetailItem label="Cidade"       value={modalVer.cidade} />
+              <DetailItem label="Cadastro"     value={formatDate(modalVer.dataCadastro)} />
+              <DetailItem label="Agendamentos" value={modalVer.totalAgendamentos} />
               <DetailItem
                 label="Total Gasto"
                 value={formatCurrency(modalVer.totalGasto)}
                 highlight
               />
             </div>
+
             {modalVer.observacoes && (
               <>
                 <div className="divider" />
                 <div className="form-group">
                   <span className="form-label">Observações</span>
-                  <p style={{ marginTop: 4, color: 'var(--color-text)' }}>{modalVer.observacoes}</p>
+                  <p style={{ marginTop: 4, color: 'var(--color-text)' }}>
+                    {modalVer.observacoes}
+                  </p>
                 </div>
               </>
             )}
+
             <Modal.Footer>
-              <button className="btn" onClick={() => setModalVer(null)}>Fechar</button>
+              <button
+                className="btn btn-danger"
+                onClick={() => handleExcluir(modalVer.id)}
+              >
+                <Trash2 size={13} /> Excluir
+              </button>
+              <button className="btn" onClick={() => setModalVer(null)}>
+                Fechar
+              </button>
             </Modal.Footer>
           </div>
         )}
@@ -281,7 +311,9 @@ function DetailItem({ label, value, highlight }) {
   return (
     <div className="detail-item">
       <span className="detail-label">{label}</span>
-      <span className={`detail-value ${highlight ? 'detail-highlight' : ''}`}>{value}</span>
+      <span className={`detail-value ${highlight ? 'detail-highlight' : ''}`}>
+        {value}
+      </span>
     </div>
   )
 }
